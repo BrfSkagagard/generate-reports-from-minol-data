@@ -12,104 +12,121 @@ namespace MinolReportsCreator
         const double FlatRate = 90;
         static void Main(string[] args)
         {
-
             string gitFolder = @"C:\Users\Mattias\Documents\GitHub\";
-            if (args != null && args.Length > 0)
+            try
             {
-                gitFolder = args[0];
-            }
-
-            var folderBoard = gitFolder + "brfskagagard-styrelsen" + Path.DirectorySeparatorChar;
-            var folderBoardExists = Directory.Exists(folderBoard);
-
-            var json = new DataContractJsonSerializer(typeof(MinoWebLogin));
-            var apartments = GetApartments(gitFolder);
-            foreach (Apartment apartment in apartments)
-            {
-                var report = new ApartmentReport();
-                report.Number = apartment.Number;
-                var folder = gitFolder + "brfskagagard-lgh" + apartment.Number + Path.DirectorySeparatorChar;
-
-                using (
-                    var stream =
-                        File.OpenRead(folder + Path.DirectorySeparatorChar + "minol-login.json"))
+                if (args != null && args.Length > 0)
                 {
-                    stream.Position = 0;
-                    var login = json.ReadObject(stream) as MinoWebLogin;
-                    if (login != null)
-                    {
-                        report.LoginInfo = login;
-                    }
+                    gitFolder = args[0];
                 }
 
-                var heatMeasurement = apartment.GetLastMonthHeatMeasure();
-                var heatLastYearMeasurement = apartment.GetMeasurmentForSameMonthLastYear(heatMeasurement);
-                var warmWaterMeasurement = apartment.GetLastMonthWarmWaterMeasure();
-                var warmWaterLastYearMeasurement = apartment.GetMeasurmentForSameMonthLastYear(warmWaterMeasurement);
-                var similarApartments = apartments.Where(a => a.Size == apartment.Size && a.Number != apartment.Number).GroupBy(a => a.Size).OrderBy(g => g.Key).FirstOrDefault().ToList();
-                var buildingApartments = apartments.Where(a => a.Building == apartment.Building && a.Number != apartment.Number).GroupBy(a => a.Building).OrderBy(g => g.Key).FirstOrDefault().ToList();
+                var folderBoard = gitFolder + "brfskagagard-styrelsen" + Path.DirectorySeparatorChar;
+                var folderBoardExists = Directory.Exists(folderBoard);
 
+                var json = new DataContractJsonSerializer(typeof(MinoWebLogin));
+                var apartments = GetApartments(gitFolder);
 
-                report.TopHeader = FirstLetterUpperCase(heatMeasurement.Period);
-                report.TopHeat = new PieInformation
+                Console.WriteLine("Number of apartments: " + apartments.Count);
+
+                foreach (Apartment apartment in apartments)
                 {
-                    Text = heatMeasurement.Consumption.ToString("0.00") // + " kWh"
-                };
-                AddPieInformation(report.TopHeat, heatMeasurement.Consumption, heatLastYearMeasurement.Consumption);
-                report.OwnHeat = report.TopHeat;
+                    var report = new ApartmentReport();
+                    report.Number = apartment.Number;
+                    var folder = gitFolder + "brfskagagard-lgh" + apartment.Number + Path.DirectorySeparatorChar;
 
-            report.TopWarmwater = new PieInformation
-            {
-                Text = warmWaterMeasurement.Consumption.ToString("0.00") // + " m³"
-                };
-                AddPieInformation(report.TopWarmwater, warmWaterMeasurement.Consumption, warmWaterLastYearMeasurement.Consumption);
-                report.OwnWarmwater = report.TopWarmwater;
-
-                var currentCost = (heatMeasurement.Cost + warmWaterMeasurement.Cost);
-                var flatRateYearlyCost = (FlatRate * apartment.Size);
-                var flatRateMonthlyCost = Math.Ceiling(flatRateYearlyCost/12);
-
-                report.TopCost = new CostPieInformation
-                {
-                    Text = currentCost.ToString("0.00")// + " kr"
-                };
-
-                if (currentCost > flatRateMonthlyCost)
-                {
-                    // we have used the flat rate.
-                    report.TopCost.IsOver = true;
-                }
-                AddPieInformation(report.TopCost, currentCost, flatRateMonthlyCost);
-
-                report.SimilarHeat = SumApartments(MeasurmentTypes.Heat, similarApartments);
-                report.SimilarWarmwater = SumApartments(MeasurmentTypes.Warmwater, similarApartments);
-
-                report.BuildingHeat = SumApartments(MeasurmentTypes.Heat, buildingApartments);
-                report.BuildingWarmwater = SumApartments(MeasurmentTypes.Warmwater, buildingApartments);
-
-                var jsonReporter = new DataContractJsonSerializer(typeof(ApartmentReport));
-
-                using (
-                    var stream =
-                        File.Create(folder +
-                                       Path.DirectorySeparatorChar + "minol-apartment-report-last-month.json"))
-                {
-                    jsonReporter.WriteObject(stream, report);
-                    stream.Flush();
-                }
-
-                // We only want to update repositories that we know about (read: that we have created)
-                if (folderBoardExists)
-                {
                     using (
                         var stream =
-                            File.Create(folderBoard + "minol-apartment-report-" + report.Number + "-last-month.json"))
+                            File.OpenRead(folder + Path.DirectorySeparatorChar + "minol-login.json"))
+                    {
+                        stream.Position = 0;
+                        var login = json.ReadObject(stream) as MinoWebLogin;
+                        if (login != null)
+                        {
+                            report.LoginInfo = login;
+                        }
+                    }
+
+                    var heatMeasurement = apartment.GetLastMonthHeatMeasure();
+                    var heatLastYearMeasurement = apartment.GetMeasurmentForSameMonthLastYear(heatMeasurement);
+                    var warmWaterMeasurement = apartment.GetLastMonthWarmWaterMeasure();
+                    var warmWaterLastYearMeasurement = apartment.GetMeasurmentForSameMonthLastYear(warmWaterMeasurement);
+                    var similarApartments = apartments.Where(a => a.Size == apartment.Size && a.Number != apartment.Number).GroupBy(a => a.Size).OrderBy(g => g.Key).FirstOrDefault().ToList();
+                    var buildingApartments = apartments.Where(a => a.Building == apartment.Building && a.Number != apartment.Number).GroupBy(a => a.Building).OrderBy(g => g.Key).FirstOrDefault().ToList();
+
+
+                    report.TopHeader = FirstLetterUpperCase(heatMeasurement.Period);
+                    report.TopHeat = new PieInformation
+                    {
+                        Text = heatMeasurement.Consumption.ToString("0.00") // + " kWh"
+                    };
+                    AddPieInformation(report.TopHeat, heatMeasurement.Consumption, heatLastYearMeasurement.Consumption);
+                    report.OwnHeat = report.TopHeat;
+
+                    report.TopWarmwater = new PieInformation
+                    {
+                        Text = warmWaterMeasurement.Consumption.ToString("0.00") // + " m³"
+                    };
+                    AddPieInformation(report.TopWarmwater, warmWaterMeasurement.Consumption, warmWaterLastYearMeasurement.Consumption);
+                    report.OwnWarmwater = report.TopWarmwater;
+
+                    var currentCost = (heatMeasurement.Cost + warmWaterMeasurement.Cost);
+                    var flatRateYearlyCost = (FlatRate * apartment.Size);
+                    var flatRateMonthlyCost = Math.Ceiling(flatRateYearlyCost / 12);
+
+                    report.TopCost = new CostPieInformation
+                    {
+                        Text = currentCost.ToString("0.00")// + " kr"
+                    };
+
+                    if (currentCost > flatRateMonthlyCost)
+                    {
+                        // we have used the flat rate.
+                        report.TopCost.IsOver = true;
+                    }
+                    AddPieInformation(report.TopCost, currentCost, flatRateMonthlyCost);
+
+                    report.SimilarHeat = SumApartments(MeasurmentTypes.Heat, similarApartments);
+                    report.SimilarWarmwater = SumApartments(MeasurmentTypes.Warmwater, similarApartments);
+
+                    report.BuildingHeat = SumApartments(MeasurmentTypes.Heat, buildingApartments);
+                    report.BuildingWarmwater = SumApartments(MeasurmentTypes.Warmwater, buildingApartments);
+
+                    var jsonReporter = new DataContractJsonSerializer(typeof(ApartmentReport));
+
+                    Console.WriteLine("\t# " + apartment.Number);
+
+                    using (
+                        var stream =
+                            File.Create(folder +
+                                           Path.DirectorySeparatorChar + "minol-apartment-report-last-month.json"))
                     {
                         jsonReporter.WriteObject(stream, report);
                         stream.Flush();
                     }
+
+                    // We only want to update repositories that we know about (read: that we have created)
+                    if (folderBoardExists)
+                    {
+                        using (
+                            var stream =
+                                File.Create(folderBoard + "minol-apartment-report-" + report.Number + "-last-month.json"))
+                        {
+                            jsonReporter.WriteObject(stream, report);
+                            stream.Flush();
+                        }
+                    }
+
+                }
+            }
+            catch (Exception ex)
+            {
+                using (var stream = File.CreateText(gitFolder + "generate-reports-last-error.txt"))
+                {
+                    stream.Write(ex.ToString());
+                    stream.Flush();
                 }
 
+                throw;
             }
         }
 
