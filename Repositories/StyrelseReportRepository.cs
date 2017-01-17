@@ -13,7 +13,8 @@ namespace MinolReportsCreator.Repositories
         {
             Heat,
             WarmWater,
-            Cost
+            Cost,
+            Period
         }
 
         public class StyrelseWarning
@@ -27,6 +28,9 @@ namespace MinolReportsCreator.Repositories
         public static List<StyrelseWarning> CreateWarnings(List<Apartment> apartments)
         {
             var warnings = new List<StyrelseWarning>();
+            string period = null;
+            var hasInvalidPeriod = false;
+
             foreach (var apartment in apartments)
             {
                 var heat = apartment.GetLastMonthHeatMeasure();
@@ -37,11 +41,12 @@ namespace MinolReportsCreator.Repositories
                     {
                         ApartmentNumber = apartment.Number,
                         Type = StyrelseWarningType.Heat,
-                        Text = "Lägenhet " + apartment.Number + " - " + heat.Consumption.ToString("0.00") + " kWh",
+                        Text = heat.Consumption.ToString("0.00"),
                         Order = heat.Consumption
                     });
                 }
 
+                // Warn if consumption is less then 0.2 (as it is seemed as unnatural)
                 var warmwater = apartment.GetLastMonthWarmWaterMeasure();
                 if (warmwater.Consumption < 0.2)
                 {
@@ -49,11 +54,12 @@ namespace MinolReportsCreator.Repositories
                     {
                         ApartmentNumber = apartment.Number,
                         Type = StyrelseWarningType.WarmWater,
-                        Text = "Lägenhet " + apartment.Number + " - " + warmwater.Consumption.ToString("0.00") + " m³",
+                        Text = warmwater.Consumption.ToString("0.00"),
                         Order = warmwater.Consumption
                     });
                 }
 
+                // Warn if cost is more then paid for
                 var cost = heat.Cost + heat.Cost;
                 var currentCost = (heat.Cost + heat.Cost);
                 var flatRateYearlyCost = (Program.FlatRate * apartment.Size);
@@ -65,10 +71,41 @@ namespace MinolReportsCreator.Repositories
                     {
                         ApartmentNumber = apartment.Number,
                         Type = StyrelseWarningType.Cost,
-                        Text = "Lägenhet " + apartment.Number + " - " + overConsumption.ToString("0.00") + " kr",
+                        Text = overConsumption.ToString("0.00"),
                         Order = overConsumption
                     });
                 }
+
+                if (heat.Period != warmwater.Period)
+                {
+                    warnings.Add(new StyrelseWarning
+                    {
+                        ApartmentNumber = apartment.Number,
+                        Type = StyrelseWarningType.Period,
+                        Text = $"Heat and warmwater measurement is not from same period (Heat:{heat.Period}, Warmwater: {warmwater.Period})",
+                        Order = apartment.Number
+                    });
+                }
+
+                // TODO: Check if all apartments have the same last period
+
+                if (period == null)
+                {
+                    period = heat.Period;
+                }
+
+                if (!hasInvalidPeriod && heat.Period != period)
+                {
+                    warnings.Add(new StyrelseWarning
+                    {
+                        ApartmentNumber = -1,
+                        Type = StyrelseWarningType.Period,
+                        Text = "Last measured period is not the same for all apartments",
+                        Order = -1
+                    });
+                    hasInvalidPeriod = true;
+                }
+
             }
 
             return warnings;
