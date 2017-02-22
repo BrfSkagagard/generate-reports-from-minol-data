@@ -61,6 +61,7 @@ namespace MinolReportsCreator.Repositories
 
                 report.BuildingHeat = SumApartments(MeasurmentTypes.Heat, buildingApartments);
                 report.BuildingWarmwater = SumApartments(MeasurmentTypes.Warmwater, buildingApartments);
+                list.Add(report);
             }
 
             return list;
